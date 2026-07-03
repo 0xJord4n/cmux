@@ -7838,66 +7838,6 @@ private final class GhosttyFlashOverlayView: NSView {
     }
 }
 
-private final class TerminalViewportBorderOverlayView: NSView {
-    var effectiveSize: CGSize? {
-        didSet { needsDisplay = true }
-    }
-
-    var drawsVisibleAreaBorder = false {
-        didSet { needsDisplay = true }
-    }
-    var drawsVisibleAreaRightBorder = false {
-        didSet { needsDisplay = true }
-    }
-    var drawsVisibleAreaBottomBorder = false {
-        didSet { needsDisplay = true }
-    }
-
-    override var acceptsFirstResponder: Bool { false }
-    override var isFlipped: Bool { true }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard drawsVisibleAreaBorder,
-              let effectiveSize,
-              effectiveSize.width > 1,
-              effectiveSize.height > 1 else {
-            return
-        }
-
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        let lineWidth = 1 / max(1, scale)
-        let width = min(effectiveSize.width, bounds.width)
-        let height = min(effectiveSize.height, bounds.height)
-        guard width > lineWidth, height > lineWidth else { return }
-
-        let path = NSBezierPath()
-        path.lineWidth = lineWidth
-        let x = width - lineWidth / 2
-        let y = height - lineWidth / 2
-        if drawsVisibleAreaRightBorder {
-            path.move(to: NSPoint(x: x, y: 0))
-            path.line(to: NSPoint(x: x, y: y))
-        }
-        if drawsVisibleAreaBottomBorder {
-            path.move(to: NSPoint(x: 0, y: y))
-            path.line(to: NSPoint(x: x, y: y))
-        }
-        // Stroke the exact window-chrome separator color used by the pane outline,
-        // sidebar trailing edge, and tab-bar separators (one source of truth), so the
-        // iOS-connected viewport border is pixel-identical to every other border in the
-        // app instead of the previous hardcoded near-white separator stroke.
-        WindowChromeColorResolver()
-            .separatorColor(forChromeBackground: GhosttyBackgroundTheme.currentColor())
-            .setStroke()
-        path.stroke()
-    }
-}
-
 final class GhosttySurfaceScrollView: NSView {
     enum FlashStyle {
         case navigation
@@ -7937,8 +7877,7 @@ final class GhosttySurfaceScrollView: NSView {
     private let inactiveOverlayView: GhosttyFlashOverlayView
     private let dropZoneOverlayView: GhosttyFlashOverlayView
     private let paneDropTargetView = TerminalPaneDropTargetView(frame: .zero)
-    private let activePaneBorderOverlayView: GhosttyFlashOverlayView
-    private let activePaneBorderLayer: CAShapeLayer
+    private let activePaneBorderOverlayView: GhosttyPaneBorderOverlayView
     private let notificationRingOverlayView: GhosttyFlashOverlayView
     private let notificationRingLayer: CAShapeLayer
     private let flashOverlayView: GhosttyFlashOverlayView
@@ -8192,8 +8131,7 @@ final class GhosttySurfaceScrollView: NSView {
         scrollView = GhosttyScrollView()
         inactiveOverlayView = GhosttyFlashOverlayView(frame: .zero)
         dropZoneOverlayView = GhosttyFlashOverlayView(frame: .zero)
-        activePaneBorderOverlayView = GhosttyFlashOverlayView(frame: .zero)
-        activePaneBorderLayer = CAShapeLayer()
+        activePaneBorderOverlayView = GhosttyPaneBorderOverlayView(frame: .zero)
         notificationRingOverlayView = GhosttyFlashOverlayView(frame: .zero)
         notificationRingLayer = CAShapeLayer()
         flashOverlayView = GhosttyFlashOverlayView(frame: .zero)
@@ -8240,17 +8178,6 @@ final class GhosttySurfaceScrollView: NSView {
         inactiveOverlayView.layer?.backgroundColor = NSColor.clear.cgColor
         inactiveOverlayView.isHidden = true
         addSubview(inactiveOverlayView)
-        activePaneBorderOverlayView.wantsLayer = true
-        activePaneBorderOverlayView.layer?.backgroundColor = NSColor.clear.cgColor
-        activePaneBorderOverlayView.layer?.masksToBounds = false
-        activePaneBorderOverlayView.autoresizingMask = [.width, .height]
-        activePaneBorderLayer.fillColor = NSColor.clear.cgColor
-        activePaneBorderLayer.lineWidth = NotificationRingMetrics.lineWidth
-        activePaneBorderLayer.lineJoin = .round
-        activePaneBorderLayer.lineCap = .round
-        activePaneBorderLayer.opacity = 0
-        activePaneBorderOverlayView.layer?.addSublayer(activePaneBorderLayer)
-        activePaneBorderOverlayView.isHidden = true
         addSubview(activePaneBorderOverlayView)
         dropZoneOverlayView.wantsLayer = true
         dropZoneOverlayView.layer?.backgroundColor = cmuxAccentNSColor().withAlphaComponent(0.25).cgColor
@@ -8710,7 +8637,6 @@ final class GhosttySurfaceScrollView: NSView {
         }
         scrollView.layoutSubtreeIfNeeded()
         updateNotificationRingPath()
-        updateActivePaneBorderPath()
         updateFlashPath(style: lastFlashStyle)
         updateFlashAppearance(style: lastFlashStyle)
         synchronizeScrollView()
@@ -8994,13 +8920,7 @@ final class GhosttySurfaceScrollView: NSView {
     }
 
     func setActivePaneBorder(color: NSColor?, visible: Bool) {
-        let shouldShow = visible && color != nil
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        activePaneBorderLayer.strokeColor = color?.cgColor
-        activePaneBorderLayer.opacity = shouldShow ? 1 : 0
-        activePaneBorderOverlayView.isHidden = !shouldShow
-        CATransaction.commit()
+        activePaneBorderOverlayView.setBorder(color: color, visible: visible)
     }
 
     func setNotificationRing(visible: Bool) {
@@ -11035,15 +10955,6 @@ final class GhosttySurfaceScrollView: NSView {
         updateOverlayRingPath(
             layer: notificationRingLayer,
             bounds: notificationRingOverlayView.bounds,
-            inset: NotificationRingMetrics.inset,
-            radius: NotificationRingMetrics.cornerRadius
-        )
-    }
-
-    private func updateActivePaneBorderPath() {
-        updateOverlayRingPath(
-            layer: activePaneBorderLayer,
-            bounds: activePaneBorderOverlayView.bounds,
             inset: NotificationRingMetrics.inset,
             radius: NotificationRingMetrics.cornerRadius
         )
