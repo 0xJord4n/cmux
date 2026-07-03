@@ -76,6 +76,7 @@ struct TerminalPanelView: View {
                 showsUnreadNotificationRing: hasUnreadNotification && notificationPaneRingEnabled,
                 inactiveOverlayColor: appearance.unfocusedOverlayNSColor,
                 inactiveOverlayOpacity: appearance.unfocusedOverlayOpacity,
+                activePaneBorderColor: isSplit ? appearance.activePaneBorderNSColor : nil,
                 searchState: panel.searchState,
                 reattachToken: panel.viewReattachToken,
                 onFocus: { _ in
@@ -309,6 +310,8 @@ struct PanelAppearance {
     let dividerColor: Color
     let unfocusedOverlayNSColor: NSColor
     let unfocusedOverlayOpacity: Double
+    let unfocusedPaneOpacity: Double
+    let activePaneBorderNSColor: NSColor?
     let usesClearContentBackground: Bool
 
     var contentBackgroundColor: NSColor {
@@ -332,6 +335,9 @@ struct PanelAppearance {
             backgroundColor: config.backgroundColor,
             opacity: config.backgroundOpacity
         )
+        let unfocusedPaneOpacityOverride = PaneAppearanceSettings.unfocusedPaneOpacityOverride()
+        let unfocusedOverlayOpacity = unfocusedPaneOpacityOverride.map { 1 - $0 }
+            ?? config.unfocusedSplitOverlayOpacity
         return PanelAppearance(
             backgroundColor: backgroundColor,
             foregroundColor: cmuxReadableForegroundNSColor(
@@ -340,7 +346,9 @@ struct PanelAppearance {
             ),
             dividerColor: Color(nsColor: config.resolvedSplitDividerColor),
             unfocusedOverlayNSColor: config.unfocusedSplitOverlayFill,
-            unfocusedOverlayOpacity: config.unfocusedSplitOverlayOpacity,
+            unfocusedOverlayOpacity: unfocusedOverlayOpacity,
+            unfocusedPaneOpacity: unfocusedPaneOpacityOverride ?? 1,
+            activePaneBorderNSColor: PaneAppearanceSettings.activePaneBorderColor(),
             usesClearContentBackground: shouldUseClearContentBackground(
                 opacity: config.backgroundOpacity,
                 usesGhosttyGlassStyle: config.backgroundBlur.isMacOSGlassStyle,

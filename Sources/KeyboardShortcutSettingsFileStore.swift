@@ -1,4 +1,5 @@
 import Combine
+import AppKit
 import CmuxFoundation
 import CmuxSettings
 import Foundation
@@ -445,6 +446,31 @@ final class CmuxSettingsFileStore {
             snapshot.managedUserDefaults[GlobalFontMagnification.percentKey] = .int(clamped)
         } else if section.keys.contains("globalFontMagnification") {
             logInvalid("app.globalFontMagnification", sourcePath: sourcePath)
+        }
+        if section.keys.contains("paneBorderColor") {
+            guard let value = parseNullableHex(
+                section["paneBorderColor"],
+                path: "app.paneBorderColor",
+                sourcePath: sourcePath
+            ) else { return }
+            snapshot.managedUserDefaults[AppCatalogSection().paneBorderColorHex.userDefaultsKey] = .nullableString(value)
+        }
+        if section.keys.contains("activePaneBorderColor") {
+            guard let value = parseNullableHex(
+                section["activePaneBorderColor"],
+                path: "app.activePaneBorderColor",
+                sourcePath: sourcePath
+            ) else { return }
+            snapshot.managedUserDefaults[AppCatalogSection().activePaneBorderColorHex.userDefaultsKey] = .nullableString(value)
+        }
+        if let value = jsonDouble(section["unfocusedPaneOpacity"]) {
+            guard value >= 0, value <= 1 else {
+                logInvalid("app.unfocusedPaneOpacity", sourcePath: sourcePath)
+                return
+            }
+            snapshot.managedUserDefaults[AppCatalogSection().unfocusedPaneOpacity.userDefaultsKey] = .double(value)
+        } else if section.keys.contains("unfocusedPaneOpacity") {
+            logInvalid("app.unfocusedPaneOpacity", sourcePath: sourcePath)
         }
         if let raw = jsonString(section["forkConversationDefaultDestination"]) {
             if let destination = AgentConversationForkDestination(rawValue: raw) {
@@ -1596,6 +1622,7 @@ final class CmuxSettingsFileStore {
             var agentSessionAutoResumeDidChange = false
             var agentHibernationDidChange = false
             var rendererRealizationDidChange = false
+            var paneAppearanceDidChange = false
             for change in changes {
                 if change.defaultsKey == TerminalScrollBarSettings.showScrollBarKey {
                     TerminalScrollBarSettings.notifyDidChange(notificationCenter: notificationCenter)
@@ -1618,6 +1645,11 @@ final class CmuxSettingsFileStore {
                     change.defaultsKey == RendererRealizationSettings.idleSecondsKey ||
                     change.defaultsKey == RendererRealizationSettings.maxWarmRenderersKey {
                     rendererRealizationDidChange = true
+                }
+                if change.defaultsKey == AppCatalogSection().paneBorderColorHex.userDefaultsKey ||
+                    change.defaultsKey == AppCatalogSection().activePaneBorderColorHex.userDefaultsKey ||
+                    change.defaultsKey == AppCatalogSection().unfocusedPaneOpacity.userDefaultsKey {
+                    paneAppearanceDidChange = true
                 }
 
                 if change.defaultsKey == AppCatalogSection().language.userDefaultsKey {
@@ -1646,6 +1678,9 @@ final class CmuxSettingsFileStore {
             }
             if rendererRealizationDidChange {
                 RendererRealizationSettings.notifyDidChange(notificationCenter: notificationCenter)
+            }
+            if paneAppearanceDidChange {
+                PaneAppearanceSettings.notifyDidChange(notificationCenter: notificationCenter)
             }
         }
         if Thread.isMainThread {
@@ -1979,5 +2014,45 @@ private enum BackupValue: Codable, Equatable {
             try container.encode(Kind.stringDictionary, forKey: .kind)
             try container.encode(value, forKey: .stringDictionaryValue)
         }
+    }
+}
+
+enum PaneAppearanceSettings {
+    static let didChangeNotification = Notification.Name("PaneAppearanceSettings.didChange")
+
+    private static let app = AppCatalogSection()
+
+    static var paneBorderColorKey: String { app.paneBorderColorHex.userDefaultsKey }
+    static var activePaneBorderColorKey: String { app.activePaneBorderColorHex.userDefaultsKey }
+    static var unfocusedPaneOpacityKey: String { app.unfocusedPaneOpacity.userDefaultsKey }
+
+    static func paneBorderColorHex(defaults: UserDefaults = .standard) -> String? {
+        normalizedHex(defaults.string(forKey: paneBorderColorKey))
+    }
+
+    static func activePaneBorderColor(defaults: UserDefaults = .standard) -> NSColor? {
+        normalizedHex(defaults.string(forKey: activePaneBorderColorKey)).flatMap(NSColor.init(hex:))
+    }
+
+    static func unfocusedPaneOpacityOverride(defaults: UserDefaults = .standard) -> Double? {
+        guard let number = defaults.object(forKey: unfocusedPaneOpacityKey) as? NSNumber else { return nil }
+        return clampOpacity(number.doubleValue)
+    }
+
+    static func clampOpacity(_ value: Double) -> Double {
+        min(max(value, 0), 1)
+    }
+
+    static func notifyDidChange(notificationCenter: NotificationCenter = .default) {
+        notificationCenter.post(name: didChangeNotification, object: nil)
+    }
+
+    private static func normalizedHex(_ raw: String?) -> String? {
+        guard let raw,
+              let normalized = WorkspaceTabColorSettings.normalizedHex(raw),
+              !normalized.isEmpty else {
+            return nil
+        }
+        return normalized
     }
 }

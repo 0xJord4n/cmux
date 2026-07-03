@@ -53,6 +53,9 @@ struct DockPanelView: View {
         .onReceive(NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)) { _ in
             refreshAppearance(reason: "ghosttyConfigDidReload")
         }
+        .onReceive(NotificationCenter.default.publisher(for: PaneAppearanceSettings.didChangeNotification)) { _ in
+            refreshAppearance(reason: "paneAppearanceDidChange")
+        }
         .onReceive(NotificationCenter.default.publisher(for: .ghosttyDefaultBackgroundDidChange)) { _ in
             refreshAppearance(reason: "ghosttyDefaultBackgroundDidChange")
         }
