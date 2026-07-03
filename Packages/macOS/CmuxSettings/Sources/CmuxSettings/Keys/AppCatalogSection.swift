@@ -99,6 +99,28 @@ public struct AppCatalogSection: SettingCatalogSection {
         userDefaultsKey: GlobalFontMagnification.percentKey
     )
 
+    /// Optional cmux pane divider/border color. Empty preserves the color
+    /// derived from the terminal/window chrome.
+    public let paneBorderColorHex = DefaultsKey<String>(
+        id: "app.paneBorderColor",
+        defaultValue: "",
+        userDefaultsKey: "paneBorderColorHex"
+    )
+
+    /// Optional active pane border color. Empty disables the active-pane border.
+    public let activePaneBorderColorHex = DefaultsKey<String>(
+        id: "app.activePaneBorderColor",
+        defaultValue: "",
+        userDefaultsKey: "activePaneBorderColorHex"
+    )
+
+    /// Opacity applied to inactive panes when set in cmux.json.
+    public let unfocusedPaneOpacity = DefaultsKey<Double>(
+        id: "app.unfocusedPaneOpacity",
+        defaultValue: 1.0,
+        userDefaultsKey: "unfocusedPaneOpacity"
+    )
+
     public let iMessageMode = DefaultsKey<Bool>(
         id: "app.iMessageMode",
         defaultValue: false,

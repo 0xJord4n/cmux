@@ -342,6 +342,26 @@
           "descriptionKey": "schemaDescriptions.app.globalFontMagnification",
           "description": "Scales cmux-owned terminals, tab titles, sidebars, settings, overlays, and app chrome by this percentage. Rendered browser page content is excluded."
         },
+        "paneBorderColor": {
+          "$ref": "#/$defs/colorHexOrNull",
+          "default": null,
+          "descriptionKey": "schemaDescriptions.app.paneBorderColor",
+          "description": "Override the cmux pane divider and border color. Set null or omit to derive it from the active terminal or window chrome."
+        },
+        "activePaneBorderColor": {
+          "$ref": "#/$defs/colorHexOrNull",
+          "default": null,
+          "descriptionKey": "schemaDescriptions.app.activePaneBorderColor",
+          "description": "Draw this color around the focused pane when a workspace or Dock has multiple panes. Set null or omit to disable the active-pane border."
+        },
+        "unfocusedPaneOpacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "descriptionKey": "schemaDescriptions.app.unfocusedPaneOpacity",
+          "description": "Opacity for inactive cmux panes in split layouts. 1 keeps inactive panes fully opaque; lower values dim them."
+        },
         "reorderOnNotification": {
           "type": "boolean",
           "default": true,

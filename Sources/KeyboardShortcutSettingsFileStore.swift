@@ -446,6 +446,31 @@ final class CmuxSettingsFileStore {
         } else if section.keys.contains("globalFontMagnification") {
             logInvalid("app.globalFontMagnification", sourcePath: sourcePath)
         }
+        if section.keys.contains("paneBorderColor") {
+            guard let value = parseNullableHex(
+                section["paneBorderColor"],
+                path: "app.paneBorderColor",
+                sourcePath: sourcePath
+            ) else { return }
+            snapshot.managedUserDefaults[AppCatalogSection().paneBorderColorHex.userDefaultsKey] = .nullableString(value)
+        }
+        if section.keys.contains("activePaneBorderColor") {
+            guard let value = parseNullableHex(
+                section["activePaneBorderColor"],
+                path: "app.activePaneBorderColor",
+                sourcePath: sourcePath
+            ) else { return }
+            snapshot.managedUserDefaults[AppCatalogSection().activePaneBorderColorHex.userDefaultsKey] = .nullableString(value)
+        }
+        if let value = jsonDouble(section["unfocusedPaneOpacity"]) {
+            guard value >= 0, value <= 1 else {
+                logInvalid("app.unfocusedPaneOpacity", sourcePath: sourcePath)
+                return
+            }
+            snapshot.managedUserDefaults[AppCatalogSection().unfocusedPaneOpacity.userDefaultsKey] = .double(value)
+        } else if section.keys.contains("unfocusedPaneOpacity") {
+            logInvalid("app.unfocusedPaneOpacity", sourcePath: sourcePath)
+        }
         if let raw = jsonString(section["forkConversationDefaultDestination"]) {
             if let destination = AgentConversationForkDestination(rawValue: raw) {
                 snapshot.managedUserDefaults[AgentConversationForkDefaultSettings.key] = .string(destination.rawValue)
@@ -1596,6 +1621,7 @@ final class CmuxSettingsFileStore {
             var agentSessionAutoResumeDidChange = false
             var agentHibernationDidChange = false
             var rendererRealizationDidChange = false
+            var paneAppearanceDidChange = false
             for change in changes {
                 if change.defaultsKey == TerminalScrollBarSettings.showScrollBarKey {
                     TerminalScrollBarSettings.notifyDidChange(notificationCenter: notificationCenter)
@@ -1618,6 +1644,11 @@ final class CmuxSettingsFileStore {
                     change.defaultsKey == RendererRealizationSettings.idleSecondsKey ||
                     change.defaultsKey == RendererRealizationSettings.maxWarmRenderersKey {
                     rendererRealizationDidChange = true
+                }
+                if change.defaultsKey == AppCatalogSection().paneBorderColorHex.userDefaultsKey ||
+                    change.defaultsKey == AppCatalogSection().activePaneBorderColorHex.userDefaultsKey ||
+                    change.defaultsKey == AppCatalogSection().unfocusedPaneOpacity.userDefaultsKey {
+                    paneAppearanceDidChange = true
                 }
 
                 if change.defaultsKey == AppCatalogSection().language.userDefaultsKey {
@@ -1646,6 +1677,9 @@ final class CmuxSettingsFileStore {
             }
             if rendererRealizationDidChange {
                 RendererRealizationSettings.notifyDidChange(notificationCenter: notificationCenter)
+            }
+            if paneAppearanceDidChange {
+                PaneAppearanceSettings.notifyDidChange(notificationCenter: notificationCenter)
             }
         }
         if Thread.isMainThread {

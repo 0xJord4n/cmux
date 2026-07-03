@@ -32,9 +32,30 @@ struct PanelContentView: View {
 
     var body: some View {
         renderedPanel
+            .opacity(nonTerminalUnfocusedOpacity)
+            .overlay {
+                activePaneBorderOverlay
+            }
             .overlay {
                 paneDropTargetOverlay
             }
+    }
+
+    private var nonTerminalUnfocusedOpacity: Double {
+        guard panel.panelType != .terminal, isSplit, !isFocused else { return 1 }
+        return appearance.unfocusedPaneOpacity
+    }
+
+    @ViewBuilder
+    private var activePaneBorderOverlay: some View {
+        if panel.panelType != .terminal,
+           isSplit,
+           isFocused,
+           let color = appearance.activePaneBorderNSColor {
+            Rectangle()
+                .strokeBorder(Color(nsColor: color), lineWidth: 2)
+                .allowsHitTesting(false)
+        }
     }
 
     @ViewBuilder

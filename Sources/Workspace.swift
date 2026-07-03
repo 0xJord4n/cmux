@@ -2889,6 +2889,7 @@ final class Workspace: Identifiable, ObservableObject {
         let borderHex = WindowChromeColorResolver()
             .separatorColor(forChromeBackground: backgroundColor)
             .hexString(includeAlpha: true)
+        let resolvedBorderHex = PaneAppearanceSettings.paneBorderColorHex() ?? borderHex
 
         if sharesWindowBackdrop {
             return .init(
@@ -2896,7 +2897,7 @@ final class Workspace: Identifiable, ObservableObject {
                 tabBarBackgroundHex: "#00000000",
                 splitButtonBackdropHex: "#00000000",
                 paneBackgroundHex: "#00000000",
-                borderHex: borderHex
+                borderHex: resolvedBorderHex
             )
         }
 
@@ -2911,7 +2912,7 @@ final class Workspace: Identifiable, ObservableObject {
             tabBarBackgroundHex: surfaceHex,
             splitButtonBackdropHex: surfaceHex,
             paneBackgroundHex: paneBackgroundHex,
-            borderHex: borderHex
+            borderHex: resolvedBorderHex
         )
     }
 
@@ -2926,6 +2927,7 @@ final class Workspace: Identifiable, ObservableObject {
         let borderHex = WindowChromeColorResolver()
             .separatorColor(forChromeBackground: backgroundColor)
             .hexString(includeAlpha: true)
+        let resolvedBorderHex = PaneAppearanceSettings.paneBorderColorHex() ?? borderHex
 
         if sharesWindowBackdrop {
             return .init(
@@ -2933,7 +2935,7 @@ final class Workspace: Identifiable, ObservableObject {
                 tabBarBackgroundHex: "#00000000",
                 splitButtonBackdropHex: "#00000000",
                 paneBackgroundHex: "#00000000",
-                borderHex: borderHex
+                borderHex: resolvedBorderHex
             )
         }
 
@@ -2948,7 +2950,7 @@ final class Workspace: Identifiable, ObservableObject {
             tabBarBackgroundHex: backgroundHex,
             splitButtonBackdropHex: backgroundHex,
             paneBackgroundHex: paneBackgroundHex,
-            borderHex: borderHex
+            borderHex: resolvedBorderHex
         )
     }
 
