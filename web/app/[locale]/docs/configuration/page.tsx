@@ -69,6 +69,9 @@ function buildSettingsFileExample(t: ConfigurationTranslation) {
   //   "windowTitleTemplate": "[cmux:{windowToken}] {activeWorkspace}",
   //   "confirmQuit": "always",
   //   "openSupportedFilesInCmux": true,
+  //   "paneBorderColor": "#5A6CFF",
+  //   "activePaneBorderColor": "#FFD166",
+  //   "unfocusedPaneOpacity": 0.82,
   //   "workspaceInheritWorkingDirectory": true,
   //   "iMessageMode": true
   // },
