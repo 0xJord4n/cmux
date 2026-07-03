@@ -322,9 +322,6 @@ struct WorkspaceContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)) { _ in
             refreshGhosttyAppearanceConfig(reason: "ghosttyConfigDidReload")
         }
-        .onReceive(NotificationCenter.default.publisher(for: PaneAppearanceSettings.didChangeNotification)) { _ in
-            refreshGhosttyAppearanceConfig(reason: "paneAppearanceDidChange", forceInitialApply: true)
-        }
         .onChange(of: colorScheme) { oldValue, newValue in
             // Keep split overlay color/opacity in sync with light/dark theme transitions.
             refreshGhosttyAppearanceConfig(reason: "colorSchemeChanged:\(oldValue)->\(newValue)")

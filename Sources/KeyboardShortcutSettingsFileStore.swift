@@ -1,11 +1,10 @@
 import Combine
-import AppKit
 import CmuxFoundation
 import CmuxSettings
 import Foundation
 import os
 
-nonisolated private let cmuxSettingsFileStoreLogger = Logger(subsystem: "com.cmuxterm.app", category: "SettingsStore")
+nonisolated let cmuxSettingsFileStoreLogger = Logger(subsystem: "com.cmuxterm.app", category: "SettingsStore")
 
 @MainActor
 final class KeyboardShortcutSettingsObserver: ObservableObject {
@@ -447,31 +446,7 @@ final class CmuxSettingsFileStore {
         } else if section.keys.contains("globalFontMagnification") {
             logInvalid("app.globalFontMagnification", sourcePath: sourcePath)
         }
-        if section.keys.contains("paneBorderColor") {
-            guard let value = parseNullableHex(
-                section["paneBorderColor"],
-                path: "app.paneBorderColor",
-                sourcePath: sourcePath
-            ) else { return }
-            snapshot.managedUserDefaults[AppCatalogSection().paneBorderColorHex.userDefaultsKey] = .nullableString(value)
-        }
-        if section.keys.contains("activePaneBorderColor") {
-            guard let value = parseNullableHex(
-                section["activePaneBorderColor"],
-                path: "app.activePaneBorderColor",
-                sourcePath: sourcePath
-            ) else { return }
-            snapshot.managedUserDefaults[AppCatalogSection().activePaneBorderColorHex.userDefaultsKey] = .nullableString(value)
-        }
-        if let value = jsonDouble(section["unfocusedPaneOpacity"]) {
-            guard value >= 0, value <= 1 else {
-                logInvalid("app.unfocusedPaneOpacity", sourcePath: sourcePath)
-                return
-            }
-            snapshot.managedUserDefaults[AppCatalogSection().unfocusedPaneOpacity.userDefaultsKey] = .double(value)
-        } else if section.keys.contains("unfocusedPaneOpacity") {
-            logInvalid("app.unfocusedPaneOpacity", sourcePath: sourcePath)
-        }
+        guard parsePaneAppearanceSettings(from: section, sourcePath: sourcePath, snapshot: &snapshot) else { return }
         if let raw = jsonString(section["forkConversationDefaultDestination"]) {
             if let destination = AgentConversationForkDestination(rawValue: raw) {
                 snapshot.managedUserDefaults[AgentConversationForkDefaultSettings.key] = .string(destination.rawValue)
@@ -1147,22 +1122,6 @@ final class CmuxSettingsFileStore {
         )
     }
 
-    private func parseNullableHex(
-        _ rawValue: Any?,
-        path: String,
-        sourcePath: String
-    ) -> String?? {
-        if rawValue is NSNull {
-            return .some(nil)
-        }
-        guard let raw = jsonString(rawValue),
-              let normalized = WorkspaceTabColorSettings.normalizedHex(raw) else {
-            logInvalid(path, sourcePath: sourcePath)
-            return nil
-        }
-        return .some(normalized)
-    }
-
     private func applyManagedSettings(
         snapshot: ResolvedSettingsSnapshot,
         importedManagedDefaults: [String: ManagedSettingsValue],
@@ -1790,10 +1749,6 @@ final class CmuxSettingsFileStore {
         }
     }
 
-    private func logInvalid(_ path: String, sourcePath: String) {
-        cmuxSettingsFileStoreLogger.warning("ignoring invalid setting '\(path, privacy: .private(mask: .hash))' in \(sourcePath, privacy: .private(mask: .hash))")
-    }
-
     private func jsonString(_ rawValue: Any?) -> String? {
         rawValue as? String
     }
@@ -1812,12 +1767,6 @@ final class CmuxSettingsFileStore {
         return number.intValue
     }
 
-    private func jsonDouble(_ rawValue: Any?) -> Double? {
-        guard let number = rawValue as? NSNumber else { return nil }
-        guard CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
-        return number.doubleValue
-    }
-
     private func jsonStringArray(_ rawValue: Any?) -> [String]? {
         guard let values = rawValue as? [Any] else { return nil }
         var strings: [String] = []
@@ -1833,7 +1782,7 @@ final class CmuxSettingsFileStore {
 
 typealias KeyboardShortcutSettingsFileStore = CmuxSettingsFileStore
 
-private struct ResolvedSettingsSnapshot {
+struct ResolvedSettingsSnapshot {
     var path: String?
     var shortcuts: [KeyboardShortcutSettings.Action: StoredShortcut] = [:]
     /// Per-action `when`-clause overrides parsed from `shortcuts.when` — gate a
@@ -1909,7 +1858,7 @@ private enum ManagedStringOverride: Equatable {
     case clear
 }
 
-private struct ManagedCustomSettings: Equatable {
+struct ManagedCustomSettings: Equatable {
     var socketPassword: ManagedStringOverride?
 
     var isEmpty: Bool {
@@ -1931,7 +1880,7 @@ private struct ManagedCustomSettings: Equatable {
     }
 }
 
-private enum ManagedSettingsValue: Codable, Equatable {
+enum ManagedSettingsValue: Codable, Equatable {
     case bool(Bool)
     case int(Int)
     case double(Double)
@@ -2014,45 +1963,5 @@ private enum BackupValue: Codable, Equatable {
             try container.encode(Kind.stringDictionary, forKey: .kind)
             try container.encode(value, forKey: .stringDictionaryValue)
         }
-    }
-}
-
-enum PaneAppearanceSettings {
-    static let didChangeNotification = Notification.Name("PaneAppearanceSettings.didChange")
-
-    private static let app = AppCatalogSection()
-
-    static var paneBorderColorKey: String { app.paneBorderColorHex.userDefaultsKey }
-    static var activePaneBorderColorKey: String { app.activePaneBorderColorHex.userDefaultsKey }
-    static var unfocusedPaneOpacityKey: String { app.unfocusedPaneOpacity.userDefaultsKey }
-
-    static func paneBorderColorHex(defaults: UserDefaults = .standard) -> String? {
-        normalizedHex(defaults.string(forKey: paneBorderColorKey))
-    }
-
-    static func activePaneBorderColor(defaults: UserDefaults = .standard) -> NSColor? {
-        normalizedHex(defaults.string(forKey: activePaneBorderColorKey)).flatMap(NSColor.init(hex:))
-    }
-
-    static func unfocusedPaneOpacityOverride(defaults: UserDefaults = .standard) -> Double? {
-        guard let number = defaults.object(forKey: unfocusedPaneOpacityKey) as? NSNumber else { return nil }
-        return clampOpacity(number.doubleValue)
-    }
-
-    static func clampOpacity(_ value: Double) -> Double {
-        min(max(value, 0), 1)
-    }
-
-    static func notifyDidChange(notificationCenter: NotificationCenter = .default) {
-        notificationCenter.post(name: didChangeNotification, object: nil)
-    }
-
-    private static func normalizedHex(_ raw: String?) -> String? {
-        guard let raw,
-              let normalized = WorkspaceTabColorSettings.normalizedHex(raw),
-              !normalized.isEmpty else {
-            return nil
-        }
-        return normalized
     }
 }
